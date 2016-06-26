@@ -1,0 +1,178 @@
+---
+title: "Reproducible Research: Peer Assessment 1"
+output: 
+  html_document:
+    keep_md: true
+---
+
+
+## Loading and preprocessing the data
+```{r, echo=T}
+setwd("/home/laur/ReproducibleResearch/courseProject1/RepData_PeerAssessment1/")
+data <- read.csv(unz("activity.zip", "activity.csv"))
+subsets <- split(data, data$date, drop=F)
+```
+
+## What is mean total number of steps taken per day?
+```{r}
+#Calculate the toal number of steps taken per day:
+totalStepsPerDay <- function(days=61, ss=subsets){
+  dailyStepsTotals <- 0
+  for(i in 1:days){
+    dailyStepsTotals <- append(dailyStepsTotals, (sum(ss[[i]]$steps, na.rm=T)))
+  }
+  return(dailyStepsTotals)
+}
+
+
+#Make a histogram of the total number of steps taken each day:
+hist(totalStepsPerDay(61))
+
+#Calculate and report the mean and median of the total number of steps taken per day:
+t <- totalStepsPerDay(61)
+mean(t)
+median(t)
+```
+
+## What is the average daily activity pattern?
+```{r}
+#The 5-minute interval that, on average, contains the maximum number of steps?
+
+#To answer this question:
+#first, this function returns a list of vectors containing the numbers of steps for each interval
+totalStepsPerInterval <- function(intervals=288,ss=subsets){
+  totalsList <- vector('list')
+  for(j in 1:intervals){
+    intervalStepsTotals <- 0
+    for(x in 1:61){
+      intervalStepsTotals <- append(intervalStepsTotals, sum(ss[[x]]$steps[j], na.rm=T))
+    }
+    totalsList <- c(totalsList, list(intervalStepsTotals))
+  }
+  return(totalsList)
+}
+
+tl <- totalStepsPerInterval(288)
+
+#then, take the mean steps for each interval, and then the maximum of all of those
+intervalMeans <- numeric()
+
+for(interval in tl){
+  intervalMeans <- append(intervalMeans, (mean(interval)))
+}
+
+max(intervalMeans)
+
+which.max(intervalMeans) #It is the 104th interval.
+```
+
+```{r}
+#Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and 
+#the average number of steps taken, averaged across all days(y-axis)
+plot(intervalMeans, type="l", xlab="5-minute interval", ylab="Mean steps taken")
+title(main="Time Series Plot of Mean Steps Taken")
+
+```
+
+## Imputing missing values
+```{r}
+#1.Total number of missing values in the dataset:
+sum(is.na(data))
+
+#Strategy for filling in all of the missing values in the dataset: 
+#I will use the mean for the 5-minute interval:
+imputing <- function(days=61,ss=subsets2){
+  for(x in 1:days){
+    for(j in 1:length(subsets2[[x]]$steps)){
+      if(is.na(subsets2[[x]]$steps[j])){
+        subsets2[[x]]$steps[j] <<- intervalMeans[j]
+      }
+    }
+  }
+}
+
+#New dataset that is equal to the original dataset but with the missing data filled in:
+subsets2 <- split(data, data$date, drop=F)
+imputing(ss=subsets2)
+
+#Histogram of the total number of steps taken each day:
+hist(totalStepsPerDay(61,subsets2))
+
+#Mean and median total number of steps taken per day:
+t2 <- totalStepsPerDay(61,ss=subsets2)
+mean(t2)
+median(t2)
+
+#Do these values differ from the estimates from the first part of the assignment? 
+#What is the impact of imputing missing data on the estimates of the total 
+#daily number of steps?
+#Yes, the mean is higher in the new set, because it contains imputed values instead
+#of NA's. In the first set, R just removed the NA's (with na.rm=T), making the total steps
+#for some of the days equal to 0. This introduced bias.
+#The median stayed the same.
+
+```
+
+
+## Are there differences in activity patterns between weekdays and weekends?
+```{r}
+#(Using the dataset with the filled-in missing values for this part.)
+#Create a new factor variable in the dataset with two levels – “weekday” and “weekend” 
+#indicating whether a given date is a weekday or weekend day:
+#(My R is in German, so I had to use the German days of the week.)
+data$date <- as.Date(data$date)
+weekdays1 <- c("Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag")
+
+data$weekDayEnd <- factor((weekdays(data$date) %in% weekdays1), levels=c("TRUE", "FALSE"), labels=c("weekday", "weekend"))
+
+subsets2 <- split(data, data$date, drop=F)
+imputing(ss=subsets2)
+
+#Panel plot containing a time series plot of the 5-minute interval 
+#(x-axis) and the average number of steps taken, averaged across all weekday days or weekend 
+#days (y-axis):
+
+subsets2WD <- vector('list')
+subsets2WD <- lapply(subsets2, subset, weekDayEnd=="weekday")
+
+tlWD <- totalStepsPerInterval(288,ss=subsets2WD)
+
+intervalMeans <- numeric()
+
+for(interval in tlWD){
+  intervalMeans <- append(intervalMeans, (mean(interval)))
+}
+
+max(intervalMeans) #Maximum average steps per inverval on weekdays
+which.max(intervalMeans) #Interval with maximum average
+
+
+
+subsets2WE <- vector('list')
+subsets2WE <- lapply(subsets2, subset, weekDayEnd=="weekend")
+
+tlWE <- totalStepsPerInterval(288,ss=subsets2WE)
+intervalMeans2 <- numeric()
+
+for(interval in tlWE){
+  intervalMeans2 <- append(intervalMeans2, (mean(interval)))
+}
+
+max(intervalMeans2) #Maximum average steps per inverval on weekends
+which.max(intervalMeans2) #Interval with maximum average
+
+#Plot them together:
+par(mfrow=c(2,1), mar=c(0.5,0.5,0.5,0.2), oma=c(2,2,0.5,0.5))
+outer=F
+
+plot(intervalMeans, type="l", xaxt='n' , ann=F)
+title(main="Weekday",font=1)
+
+plot(intervalMeans2, type="l")
+title(main="Weekend")
+
+mtext("5-minute interval", side=1, outer=T)
+mtext("Mean steps taken", side =2, outer=T)
+
+#Yes, a difference in activity patterns between weekdays and weekends can be clearly seen in this plot.
+```
